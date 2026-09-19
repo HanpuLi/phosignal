@@ -1,0 +1,62 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "17 4 * * 1"
+
+permissions:
+  contents: read
+  packages: read
+  security-events: write
+
+jobs:
+  interpreted:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [actions, python]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}
+
+  native:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [c-cpp, swift]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: manual
+      - name: Build traced Swift code
+        if: matrix.language == 'swift'
+        run: |
+          mkdir -p .codeql-build
+          cat Sources/SignalProfiles.swift Sources/phosignald.swift > .codeql-build/DaemonMain.swift
+          cat Sources/SignalProfiles.swift Sources/ProfileSettingsController.swift Sources/PhoSignalApp.swift > .codeql-build/AppMain.swift
+          xcrun swiftc -Onone .codeql-build/DaemonMain.swift -o .codeql-build/phosignal-cli
+          xcrun swiftc -Onone .codeql-build/AppMain.swift -framework AppKit -framework ApplicationServices -o .codeql-build/PhoSignal
+      - name: Build traced C/C++ code
+        if: matrix.language == 'c-cpp'
+        run: |
+          mkdir -p .codeql-build
+          xcrun clang -O0 -Wall -Wextra Helpers/magsafe-led.c -framework IOKit -o .codeql-build/magsafe-led
+          xcrun clang -O0 -Wall -Wextra Integrations/chatgpt-status-watch.c -framework ApplicationServices -framework CoreGraphics -framework CoreFoundation -o .codeql-build/chatgpt-status-watch
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}
