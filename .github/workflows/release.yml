@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  validate:
     runs-on: macos-15
     timeout-minutes: 25
     steps:
@@ -27,33 +27,36 @@ jobs:
           ./Tests/run-profile-store-tests.sh
           ./Tests/run-hook-config-tests.sh
           ./Tests/run-hook-behaviour-tests.sh
-      - name: Build signed release archive
-        run: ./scripts/build.sh
-      - name: Verify release archive
+      - name: Build and verify source-build archive
         run: |
+          ./scripts/build.sh
           VERIFY="$(mktemp -d /tmp/phosignal-release.XXXXXX)"
-          ditto -x -k ".build/release/PhoSignal-$(cat VERSION).zip" "$VERIFY"
+          DITTONORSRC=1 ditto -x -k --norsrc --noextattr --noacl ".build/release/PhoSignal-$(cat VERSION).zip" "$VERIFY"
           codesign --verify --deep --strict "$VERIFY/PhoSignal.app"
-          shasum -a 256 ".build/release/PhoSignal-$(cat VERSION).zip" > SHA256SUMS
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: release-assets
-          path: |
-            .build/release/PhoSignal-*.zip
-            SHA256SUMS
-          if-no-files-found: error
 
   github-release:
-    needs: build
+    needs: validate
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: release-assets
-      - name: Publish GitHub Release
+      - name: Publish source-only GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" PhoSignal-*.zip SHA256SUMS             --repo "$GITHUB_REPOSITORY"             --verify-tag             --generate-notes             --title "PhoSignal $GITHUB_REF_NAME"
+          cat > /tmp/release-notes.md <<'EOF'
+          Source-only release. No prebuilt PhoSignal.app is attached yet.
+
+          Build and install on a supported Mac with:
+
+          ```sh
+          ./scripts/install.sh
+          ```
+
+          CI validates an ad-hoc-signed source build, but public binary distribution is intentionally deferred until PhoSignal has a stable Developer ID Application signing and notarisation path.
+          EOF
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "PhoSignal $GITHUB_REF_NAME" \
+            --notes-file /tmp/release-notes.md
