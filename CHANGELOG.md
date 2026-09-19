@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.0 — unreleased
+## 1.0.0 — 2026-09-19
 
 - First public release under the PhoSignal name.
 - Editable built-in and custom profiles.
