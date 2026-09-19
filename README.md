@@ -1,6 +1,7 @@
 # PhoSignal
 
 [![CI](https://github.com/HanpuLi/phosignal/actions/workflows/ci.yml/badge.svg)](https://github.com/HanpuLi/phosignal/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/HanpuLi/phosignal/actions/workflows/codeql.yml/badge.svg)](https://github.com/HanpuLi/phosignal/actions/workflows/codeql.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Turn the MacBook itself into a local status light for AI agents.
