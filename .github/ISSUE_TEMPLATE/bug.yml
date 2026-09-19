@@ -1,0 +1,58 @@
+name: Bug report
+description: Report a reproducible PhoSignal problem
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please run `phosignal doctor` first. Do not paste credentials, conversation text, or unrelated system logs.
+  - type: input
+    id: mac
+    attributes:
+      label: Mac model
+      placeholder: e.g. MacBook Pro (14-inch, M3 Pro)
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: e.g. 15.6
+    validations:
+      required: true
+  - type: dropdown
+    id: channel
+    attributes:
+      label: Affected output
+      options:
+        - Keyboard backlight
+        - MagSafe LED
+        - Both
+        - Source detection / hooks
+        - Menu-bar UI
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Redacted `phosignal doctor` output
+      description: Remove user paths or anything you do not want public.

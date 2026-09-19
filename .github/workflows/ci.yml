@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax
+        run: |
+          zsh -n scripts/*.sh Tests/*.sh
+          python3 -m py_compile Integrations/phosignal-hook.py scripts/configure-hooks.py
+      - name: Profile store tests
+        run: |
+          chmod +x Tests/*.sh scripts/*.sh
+          ./Tests/run-profile-store-tests.sh
+      - name: Hook merge tests
+        run: ./Tests/run-hook-config-tests.sh
+      - name: Hook lifecycle/privacy tests
+        run: ./Tests/run-hook-behaviour-tests.sh
+      - name: Build native components and app
+        run: ./scripts/build.sh
+      - name: Verify release archive
+        run: |
+          mkdir -p /tmp/phosignal-ci
+          ditto -x -k ".build/release/PhoSignal-$(cat VERSION).zip" /tmp/phosignal-ci
+          codesign --verify --deep --strict "/tmp/phosignal-ci/PhoSignal.app"

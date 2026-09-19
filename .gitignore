@@ -1,0 +1,9 @@
+.DS_Store
+.build/
+*.xcuserstate
+*.bak
+*.log
+*.pyc
+__pycache__/
+dist/
+release/

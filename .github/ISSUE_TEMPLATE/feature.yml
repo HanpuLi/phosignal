@@ -1,0 +1,23 @@
+name: Feature request
+description: Propose a bounded improvement
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What workflow or limitation should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: safety
+    attributes:
+      label: Hardware / privacy / privilege implications
+      description: Note any change to private APIs, Accessibility, hooks, SMC, sudo, or stored data.
