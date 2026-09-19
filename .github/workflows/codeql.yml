@@ -13,33 +13,43 @@ permissions:
   packages: read
   security-events: write
 
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   interpreted:
     name: CodeQL (${{ matrix.language }})
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         language: [actions, python]
     steps:
-      - uses: actions/checkout@v7
-      - uses: github/codeql-action/init@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v4
         with:
           languages: ${{ matrix.language }}
-      - uses: github/codeql-action/analyze@v4
+      - uses: github/codeql-action/analyze@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v4
         with:
           category: /language:${{ matrix.language }}
 
   native:
     name: CodeQL (${{ matrix.language }})
     runs-on: macos-15
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
         language: [c-cpp, swift]
     steps:
-      - uses: actions/checkout@v7
-      - uses: github/codeql-action/init@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v4
         with:
           languages: ${{ matrix.language }}
           build-mode: manual
@@ -57,6 +67,6 @@ jobs:
           mkdir -p .codeql-build
           xcrun clang -O0 -Wall -Wextra Helpers/magsafe-led.c -framework IOKit -o .codeql-build/magsafe-led
           xcrun clang -O0 -Wall -Wextra Integrations/chatgpt-status-watch.c -framework ApplicationServices -framework CoreGraphics -framework CoreFoundation -o .codeql-build/chatgpt-status-watch
-      - uses: github/codeql-action/analyze@v4
+      - uses: github/codeql-action/analyze@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v4
         with:
           category: /language:${{ matrix.language }}
