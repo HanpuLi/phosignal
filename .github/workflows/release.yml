@@ -1,0 +1,62 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Tag/version guard
+        run: |
+          test "v$(tr -d '[:space:]' < VERSION)" = "$GITHUB_REF_NAME"
+      - name: Syntax and tests
+        run: |
+          zsh -n scripts/*.sh Tests/*.sh
+          python3 -m py_compile Integrations/phosignal-hook.py scripts/configure-hooks.py
+          chmod +x Tests/*.sh scripts/*.sh
+          ./Tests/run-profile-store-tests.sh
+          ./Tests/run-hook-config-tests.sh
+          ./Tests/run-hook-behaviour-tests.sh
+      - name: Build and verify source-build archive
+        run: |
+          ./scripts/build.sh
+          VERIFY="$(mktemp -d /tmp/phosignal-release.XXXXXX)"
+          DITTONORSRC=1 ditto -x -k --norsrc --noextattr --noacl ".build/release/PhoSignal-$(cat VERSION).zip" "$VERIFY"
+          codesign --verify --deep --strict "$VERIFY/PhoSignal.app"
+
+  github-release:
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Publish source-only GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > /tmp/release-notes.md <<'EOF'
+          Source-only release. No prebuilt PhoSignal.app is attached yet.
+
+          Build and install on a supported Mac with:
+
+          ```sh
+          ./scripts/install.sh
+          ```
+
+          CI validates an ad-hoc-signed source build, but public binary distribution is intentionally deferred until PhoSignal has a stable Developer ID Application signing and notarisation path.
+          EOF
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "PhoSignal $GITHUB_REF_NAME" \
+            --notes-file /tmp/release-notes.md

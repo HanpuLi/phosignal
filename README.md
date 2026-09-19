@@ -62,6 +62,10 @@ Check the installation:
 "$HOME/Library/Application Support/PhoSignal/bin/phosignal" doctor
 ```
 
+## Releases
+
+GitHub releases are source-only for now. CI validates an ad-hoc-signed build, but PhoSignal does not publish that build as a downloadable application because it is not Developer ID signed and notarised. Prebuilt app releases will only be added once that stable signing/notarisation path exists.
+
 ## Uninstall
 
 ```sh
