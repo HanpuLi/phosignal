@@ -36,6 +36,15 @@ func log(_ s: String) {
     FileHandle.standardError.write((f.string(from: Date()) + " " + s + "\n").data(using: .utf8)!)
 }
 
+private func freshNullHandle() -> FileHandle? {
+    FileHandle(forWritingAtPath: "/dev/null")
+}
+
+private func closePipe(_ pipe: Pipe) {
+    try? pipe.fileHandleForReading.close()
+    try? pipe.fileHandleForWriting.close()
+}
+
 final class KB {
     typealias FQ = @convention(c) (AnyObject, Selector, UInt64) -> Float
     typealias BQ = @convention(c) (AnyObject, Selector, UInt64) -> Bool
@@ -81,9 +90,16 @@ func magsafe(_ mode: String) {
     guard fm.isExecutableFile(atPath: magsafeBin) else { return }
     magsafeQueue.async {
         let p = Process()
+        let stdout = freshNullHandle()
+        let stderr = freshNullHandle()
         p.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
         p.arguments = ["-n", magsafeBin, mode]
-        p.standardOutput = FileHandle.nullDevice; p.standardError = FileHandle.nullDevice
+        p.standardOutput = stdout
+        p.standardError = stderr
+        defer {
+            try? stdout?.close()
+            try? stderr?.close()
+        }
         do { try p.run(); p.waitUntilExit() } catch { log("magsafe: \(error)") }
     }
 }
@@ -283,28 +299,49 @@ final class SignalEngine {
         return cachedMagStyle
     }
 
+    func invalidateBattery(_ reason: String) {
+        batteryPercent = -1
+        batteryCharged = false
+        batteryOnAC = false
+        log(reason)
+    }
+
     func refreshBattery(force: Bool = false) {
         let now = Date()
         guard force || now.timeIntervalSince(lastBatteryCheck) >= 30 else { return }
         lastBatteryCheck = now
+
         let p = Process()
         let pipe = Pipe()
+        let stderr = freshNullHandle()
         p.executableURL = URL(fileURLWithPath: "/usr/bin/pmset")
         p.arguments = ["-g", "batt"]
-        p.standardOutput = pipe; p.standardError = FileHandle.nullDevice
+        p.standardOutput = pipe
+        p.standardError = stderr
+        defer {
+            closePipe(pipe)
+            try? stderr?.close()
+        }
+
         do {
-            try p.run(); p.waitUntilExit()
+            try p.run()
+            p.waitUntilExit()
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            guard let text = String(data: data, encoding: .utf8) else { return }
-            if let re = try? NSRegularExpression(pattern: #"([0-9]+)%"#),
-               let m = re.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
-               let r = Range(m.range(at: 1), in: text) {
-                batteryPercent = Int(text[r]) ?? batteryPercent
+            guard p.terminationStatus == 0,
+                  let text = String(data: data, encoding: .utf8),
+                  let re = try? NSRegularExpression(pattern: #"([0-9]+)%"#),
+                  let m = re.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+                  let r = Range(m.range(at: 1), in: text),
+                  let percent = Int(text[r])
+            else {
+                invalidateBattery("battery read returned no valid charge state")
+                return
             }
+            batteryPercent = percent
             batteryCharged = text.localizedCaseInsensitiveContains("; charged;")
             batteryOnAC = text.localizedCaseInsensitiveContains("AC Power")
         } catch {
-            log("battery read failed: \(error)")
+            invalidateBattery("battery read failed: \(error)")
         }
     }
 
@@ -688,6 +725,7 @@ case "doctor":
         p.standardOutput = pipe
         p.standardError = pipe
         do {
+            defer { closePipe(pipe) }
             try p.run(); p.waitUntilExit()
             let text = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -704,11 +742,16 @@ case "doctor":
     let service = "gui/\(getuid())/io.github.hanpuli.phosignal.daemon"
     let lp = Process()
     let lpipe = Pipe()
+    let lstderr = freshNullHandle()
     lp.executableURL = URL(fileURLWithPath: "/bin/launchctl")
     lp.arguments = ["print", service]
     lp.standardOutput = lpipe
-    lp.standardError = FileHandle.nullDevice
+    lp.standardError = lstderr
     do {
+        defer {
+            closePipe(lpipe)
+            try? lstderr?.close()
+        }
         try lp.run(); lp.waitUntilExit()
         let text = String(data: lpipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
         if text.contains("state = running") { print("daemon: running") }

@@ -103,18 +103,50 @@ private let rawStyles: [RawStyle] = [
     .init(id: "solid-amber", name: "Solid amber")
 ]
 
+private func freshNullHandle() -> FileHandle? {
+    FileHandle(forWritingAtPath: "/dev/null")
+}
+
+private func closePipe(_ pipe: Pipe) {
+    try? pipe.fileHandleForReading.close()
+    try? pipe.fileHandleForWriting.close()
+}
+
 @discardableResult
 private func run(_ executable: String, _ args: [String], wait: Bool = true) -> String {
     let p = Process()
-    let pipe = Pipe()
     p.executableURL = URL(fileURLWithPath: executable)
     p.arguments = args
+
+    if !wait {
+        let stdout = freshNullHandle()
+        let stderr = freshNullHandle()
+        p.standardOutput = stdout
+        p.standardError = stderr
+        defer {
+            try? stdout?.close()
+            try? stderr?.close()
+        }
+        do {
+            try p.run()
+            return ""
+        } catch {
+            return ""
+        }
+    }
+
+    let pipe = Pipe()
+    let stderr = freshNullHandle()
     p.standardOutput = pipe
-    p.standardError = FileHandle.nullDevice
+    p.standardError = stderr
+    defer {
+        closePipe(pipe)
+        try? stderr?.close()
+    }
+
     do {
         try p.run()
-        if wait { p.waitUntilExit() }
-        guard wait else { return "" }
+        p.waitUntilExit()
         return String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
     } catch {
         return ""
@@ -987,12 +1019,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let process = Process()
+        let stdout = freshNullHandle()
+        let stderr = freshNullHandle()
         process.executableURL = URL(fileURLWithPath: watcher)
         var env = ProcessInfo.processInfo.environment
         env["PHOSIGNAL_STATE_DIR"] = stateDir
         process.environment = env
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
+        process.standardOutput = stdout
+        process.standardError = stderr
         process.terminationHandler = { [weak self] _ in
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                 guard let self, !self.terminating else { return }
@@ -1002,9 +1036,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         do {
             try process.run()
+            try? stdout?.close()
+            try? stderr?.close()
             chatgptWatcher = process
             appLog("ChatGPT watcher started pid=\(process.processIdentifier)")
         } catch {
+            try? stdout?.close()
+            try? stderr?.close()
             appLog("ChatGPT watcher failed: \(error)")
         }
     }
