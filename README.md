@@ -6,6 +6,8 @@
 
 Turn the MacBook itself into a local status light for AI agents.
 
+**Maintainer:** [Hanpu Li / 李函璞](https://hanpuli.github.io/) · [portfolio / project index](https://hanpuli.github.io/#work)
+
 PhoSignal maps ChatGPT Desktop, Codex and Claude Code activity to two pieces of built-in hardware:
 
 - the MacBook keyboard backlight, with smooth continuous brightness curves;
